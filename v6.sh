@@ -9,6 +9,12 @@ obtener_ip() {
     echo "$ip_local"
 }
 
+# Función para obtener la fecha y hora actual en formato YYYY-MM-DD HH:MM:SS
+obtener_fecha_hora() {
+    fecha_hora=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "$fecha_hora"
+}
+
 # Función para mostrar el menú
 mostrar_menu() {
     clear
@@ -16,6 +22,7 @@ mostrar_menu() {
     echo "         Menú de administración"
     echo "====================================="
     echo "IP del equipo: $(obtener_ip)"
+    echo "Fecha y hora: $(obtener_fecha_hora)"
     echo "====================================="
     echo "1. Administrar sitios"
     echo "2. Crear o editar sitios"
@@ -27,7 +34,6 @@ mostrar_menu() {
     echo "8. Ejecutar otro script"
     echo "9. Salir"
     echo "====================================="
-    echo -n "Seleccione una opción: "
 }
 
 # Función para ejecutar un script adicional
@@ -215,16 +221,21 @@ deshabilitar_puerto() {
 eliminar_puerto() {
     echo "Seleccione el número del puerto para eliminar:"
     i=1
-    sudo ufw status | grep "ALLOW" | awk '{print $1}' | while read puerto; do
+    puertos=($(sudo ufw status | grep "ALLOW" | awk '{print $1}'))
+    for puerto in "${puertos[@]}"; do
         echo "$i. $puerto"
         ((i++))
     done
     echo -n "Seleccione el número del puerto a eliminar: "
     read opcion
-    if [[ $opcion -ge 1 ]] && [[ $opcion -lt $i ]]; then
-        puerto=$(sudo ufw status | grep "ALLOW" | awk '{print $1}' | sed -n "${opcion}p")
+    if [[ $opcion -ge 1 ]] && [[ $opcion -le ${#puertos[@]} ]]; then
+        puerto=${puertos[$((opcion - 1))]}
         sudo ufw delete allow $puerto
-        echo "Puerto $puerto eliminado de UFW."
+        if [ $? -eq 0 ]; then
+            echo "Puerto $puerto eliminado de UFW."
+        else
+            echo "Error al eliminar el puerto $puerto."
+        fi
     else
         echo "Opción inválida."
     fi
@@ -351,6 +362,34 @@ administrar_php() {
     esac
 }
 
+# Función para actualizar el sistema
+actualizar_sistema() {
+    sudo apt update -y
+    echo "¿Desea realizar un upgrade del sistema? (s/n)"
+    read respuesta
+    if [[ "$respuesta" == "s" || "$respuesta" == "S" ]]; then
+        sudo apt upgrade -y
+        echo "Sistema actualizado."
+    else
+        echo "Upgrade cancelado. Regresando al submenú..."
+    fi
+}
+
+# Función para comprobar actualización del sistema
+comprobar_actualizacion_sistema() {
+    sudo apt update -y
+    version_actual=$(lsb_release -d | awk -F"\t" '{print $2}')
+    echo "Versión actual: $version_actual"
+    sudo do-release-upgrade -c
+    echo "¿Desea actualizar el sistema operativo a la última versión? (s/n)"
+    read respuesta
+    if [[ "$respuesta" == "s" || "$respuesta" == "S" ]]; then
+        sudo do-release-upgrade -d
+    else
+        echo "Actualización cancelada. Regresando al submenú..."
+    fi
+}
+
 # Función para gestionar el sistema (apagar, bloquear, reiniciar)
 gestionar_sistema() {
     echo "Seleccione una opción:"
@@ -359,6 +398,8 @@ gestionar_sistema() {
     echo "3. Reiniciar el sistema"
     echo "4. Reiniciar las interfaces de red"
     echo "5. Renovar las interfaces de red"
+    echo "6. Actualizar el sistema"
+    echo "7. Comprobar y actualizar el sistema operativo"
     echo -n "Seleccione una opción: "
     read opcion
     case $opcion in
@@ -367,6 +408,8 @@ gestionar_sistema() {
         3) sudo reboot ;;
         4) sudo systemctl restart network-manager ;;
         5) sudo dhclient ;;
+        6) actualizar_sistema ;;
+        7) comprobar_actualizacion_sistema ;;
         *) echo "Opción inválida." ;;
     esac
 }
@@ -374,6 +417,7 @@ gestionar_sistema() {
 # Menú principal
 while true; do
     mostrar_menu
+    echo -n "Seleccione una opción: "
     read opcion
     case $opcion in
         1) 
